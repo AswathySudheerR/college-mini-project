@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'login.dart';
 import 'pages/search_remote_bus.dart';
+import 'pages/live_bus.dart';
 
 void main() async{
   
@@ -51,7 +52,6 @@ class MyHomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Bus Search'),
         actions: <Widget>[
           IconButton(
             icon: Icon(Icons.login),
@@ -84,16 +84,24 @@ class MyHomePage extends StatelessWidget {
               SizedBox(height: 50),
               ElevatedButton.icon(
                 onPressed: () async {
-                  var status = await Permission.location.request();
-                  if (status.isGranted) {
-                    Position position = await Geolocator.getCurrentPosition(
-                        desiredAccuracy: LocationAccuracy.high);
-                    print('Device location - Latitude: ${position.latitude}, Longitude: ${position.longitude}');
-                  } else {
-                    print('Location permission denied.');
-                  }
-                },
-                icon: Icon(Icons.search),
+  var status = await Permission.location.request();
+  if (status.isGranted) {
+    Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+    print('Device location - Latitude: ${position.latitude}, Longitude: ${position.longitude}');
+    
+    // Navigate to LiveBusSearchPage
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => LiveBusSearchPage( latitude: position.latitude,
+        longitude: position.longitude,)),
+    );
+  } else {
+    print('Location permission denied.');
+  }
+},
+
+                icon: Icon(Icons.search) ,
                 label: Text(
                   'Search Live Buses',
                   style: TextStyle(fontSize: 20),
@@ -219,16 +227,3 @@ class SearchPageState extends State<SearchPage> {
   }
 }
 
-
-
-
-//GestureDetector(
-  //                  onTap: widget.showRegisterPage,
-    //                child: const Text(
-    //                  'Register now',
-    //                  style: TextStyle(
-    //                    color: Color.fromARGB(255, 97, 97, 97),
-    //                    fontWeight: FontWeight.bold,
-    //                  ),
-    //                ),
-    //              ),
