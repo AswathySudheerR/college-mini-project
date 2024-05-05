@@ -1,11 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class LiveBusSearchPage extends StatelessWidget {
+class LiveBusSearchPage extends StatefulWidget {
   final double latitude;
   final double longitude;
 
   LiveBusSearchPage({required this.latitude, required this.longitude});
+
+  @override
+  _LiveBusSearchPageState createState() => _LiveBusSearchPageState();
+}
+
+class _LiveBusSearchPageState extends State<LiveBusSearchPage> {
+  List<DocumentSnapshot> _nearestBusStops = [];
+  List<DocumentSnapshot> _busesPassingThroughStops = [];
+
+  @override
+  void initState() {
+    super.initState();
+    getNearestBusStopsAndBuses(widget.latitude, widget.longitude);
+  }
+
+  Future<void> getNearestBusStopsAndBuses(double latitude, double longitude) async {
+  
+    _nearestBusStops = await retrieveNearestBusStops(latitude, longitude);
+    _busesPassingThroughStops = await retrieveBusesPassingThroughStops(_nearestBusStops);
+    setState(() {});
+  }
+
+  Future<List<DocumentSnapshot>> retrieveNearestBusStops(double latitude, double longitude) async {
+    double radius = 10.0;
+    double latOffset = 0.009 * radius;
+    double lonOffset = 0.009 * radius;
+
+    QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+        .collection('Stops')
+        .where('latitude', isGreaterThan: latitude - latOffset)
+        .where('latitude', isLessThan: latitude + latOffset)
+        .where('longitude', isGreaterThan: longitude - lonOffset)
+        .where('longitude', isLessThan: longitude + lonOffset)
+        .get();
+
+    return querySnapshot.docs;
+  }
+
+  Future<List<DocumentSnapshot>> retrieveBusesPassingThroughStops(List<DocumentSnapshot> busStops) async {
+    List<DocumentSnapshot> busesPassingThroughStops = [];
+
+    for (var busStop in busStops) {
+      QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+          .collection('Buses')
+          .where('stops', arrayContains: busStop.id)
+          .get();
+
+      busesPassingThroughStops.addAll(querySnapshot.docs);
+    }
+
+    return busesPassingThroughStops;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,54 +69,26 @@ class LiveBusSearchPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Live Bus Search Results'),
-            Text('Latitude: $latitude'),
-            Text('Longitude: $longitude'),
-            FutureBuilder(
-              future: fetchBuses(latitude, longitude),
-              builder: (context, AsyncSnapshot<List<String>> snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return CircularProgressIndicator();
-                } else if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}');
-                } else {
-                  if (snapshot.data!.isEmpty) {
-                    return Text('No buses found near your location.');
-                  } else {
-                    return Column(
-                      children: snapshot.data!.map((bus) {
-                        return Text(bus);
-                      }).toList(),
-                    );
-                  }
-                }
-              },
-            ),
+            Text('Nearest Bus Stops:'),
+            _nearestBusStops.isEmpty
+                ? CircularProgressIndicator()
+                : Column(
+                    children: _nearestBusStops.map((busStop) {
+                      return Text(busStop['name']);
+                    }).toList(),
+                  ),
+            SizedBox(height: 20),
+            Text('Buses Passing Through Nearest Bus Stops:'),
+            _busesPassingThroughStops.isEmpty
+                ? CircularProgressIndicator()
+                : Column(
+                    children: _busesPassingThroughStops.map((bus) {
+                      return Text(bus['name']);
+                    }).toList(),
+                  ),
           ],
         ),
       ),
     );
-  }
-
-  Future<List<String>> fetchBuses(double latitude, double longitude) async {
-    // Define a radius for the search (in kilometers)
-    double radius = 10.0; // Adjust this value as needed
-
-    // Query Firestore for buses within the specified radius of the provided latitude and longitude
-    QuerySnapshot querySnapshot = await FirebaseFirestore.instance
-        .collection('buses')
-        .where('latitude', isGreaterThan: latitude - (0.009 * radius))
-        .where('latitude', isLessThan: latitude + (0.009 * radius))
-        .where('longitude', isGreaterThan: longitude - (0.009 * radius))
-        .where('longitude', isLessThan: longitude + (0.009 * radius))
-        .get();
-
-    // Extract bus information from the query results
-    List<String> buses = [];
-    querySnapshot.docs.forEach((doc) {
-      buses.add(doc['busName']);
-    });
-
-    return buses;
   }
 }
